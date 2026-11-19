@@ -400,6 +400,7 @@ public final class MainController: NSViewController, NSMenuItemValidation, NSWin
         }
         spaceButton.isEnabled = plusButton.isEnabled
         settingsButton.isEnabled = plusButton.isEnabled
+        counterButton.isEnabled = plusButton.isEnabled
         view.effectiveAppearance.performAsCurrentDrawingAppearance {
             savePanel.layer?.backgroundColor = NSColor(srgbRed: 33 / 255, green: 36 / 255, blue: 38 / 255, alpha: 1).cgColor
             savePanel.layer?.borderColor = NSColor.systemRed.cgColor

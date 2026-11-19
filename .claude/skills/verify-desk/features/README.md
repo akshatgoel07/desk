@@ -42,7 +42,7 @@ Each feature file starts with an H1 title and one paragraph about the user-visib
 - [Canvas gestures](./canvas-gestures.md) covers click, Shift-click, lasso, group drag, Escape cancel, Space pan, Select All, and Delete.
 - [Viewport](./viewport.md) covers zoom commands, Fit Content, scroll pan, pinch, camera interruption, and window resize.
 - [Images](./images.md) covers image drop, image paste, resize handles, and the image save panel.
-- [Download](./download.md) covers Markdown export of notes to `~/Downloads` and mixed selections.
+- [Download](./download.md) covers Markdown export of notes to `~/Downloads` and mixed selections of notes and images.
 - [Spaces](./spaces.md) covers New Space, the Spaces menu, Command-number switch, rename, delete with confirmation, and undo.
 - [Paywall and routes](./paywall-and-routes.md) covers Desk Pro from Board Settings and the unreachable `desk://` routes.
 - [Checklist](./checklist.md) covers the checklist sidebar, the counter, the Colors row, and persistence in the defaults suite.

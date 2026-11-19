@@ -34,8 +34,13 @@ public final class FFmpegConverter {
             proc.arguments = ["-y", "-i", url.path] + Self.remuxProfile + [out.path]
             proc.standardError = FileHandle.nullDevice
             Task { @MainActor in self?.currentProcess = proc }
-            proc.terminationHandler = { [weak self] _ in
+            proc.terminationHandler = { [weak self] process in
                 Task { @MainActor in self?.currentProcess = nil }
+                guard process.terminationStatus == 0 else {
+                    try? FileManager.default.removeItem(at: out)
+                    cont.resume(returning: nil)
+                    return
+                }
                 cont.resume(returning: FileManager.default.fileExists(atPath: out.path) ? out : nil)
             }
             try? proc.run()

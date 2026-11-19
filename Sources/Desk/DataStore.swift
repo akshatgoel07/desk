@@ -179,11 +179,11 @@ public final class NoteStore {
                 NSPredicate(format: "kind IN %@ AND space.id == %@", ["note", "image"], $0 as CVarArg)
             } ?? NSPredicate(format: "kind IN %@", ["note", "image"])
             request.sortDescriptors = [NSSortDescriptor(key: "zIndex", ascending: true)]
-            return try context.fetch(request).map { item in
+            return try context.fetch(request).compactMap { item in
                 let image: ImageAttachment?
                 if item.kind == "image" {
                     guard let bytes = item.imageData, let decoded = ImageAttachment(data: bytes, name: item.imageName ?? "Image") else {
-                        throw NoteStoreError.storage("Cannot read the image bytes.")
+                        return nil
                     }
                     image = decoded
                 } else {

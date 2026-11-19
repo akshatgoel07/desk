@@ -45,10 +45,10 @@ The app uses ffmpeg from `/opt/homebrew/bin` when that tool exists.
 | Area | State |
 |---|---|
 | Window shell with full size content | working |
-| Canvas selection, group drag, lasso, Space pan, and corner resize | Native replay verifies scales 0.3, 1, and 4 |
+| Canvas selection, group drag, lasso, Space pan, and image resize | Native replay verifies scales 0.3, 1, and 4. Image cards have eight resize handles. Note cards have no resize handles |
 | Viewport pan, anchored pinch, zoom controls, and Fit Content | Native replay verifies pointer alignment and camera interruption |
 | Spring core and native opacity feedback | Forty camera transitions preserve their final targets |
-| Local note persistence in Core Data | Create, edit, move, resize, and delete survive restart with stable identity |
+| Local note persistence in Core Data | Create, edit, move, image resize, and delete survive restart with stable identity |
 | Native note editor | Paragraphs, clipboard, text undo, and card undo pass. Live input method composition remains open |
 | ffmpeg remux profile, yuv420p faststart, AAC `aac_at 128k` fallback, serial process queue, probe via ffprobe | working, needs real media files |
 | Video item with `AVPlayerLooper` | working with any local mp4 passed in code |
@@ -58,7 +58,9 @@ The app uses ffmpeg from `/opt/homebrew/bin` when that tool exists.
 | Empty, populated, load error, and save error states | Samples require an explicit command. Retry and Dismiss perform their named actions |
 | Native controls, keyboard focus, and note accessibility | Names, roles, values, note actions, and focus order pass |
 | Display accessibility preferences | Reduce Motion, Increase Contrast, and Reduce Transparency branches require enabled preference checks |
-| Missing on purpose | | sidebar, bookmarks, web clips, social providers, importers, xAuth PKCE, toasts, gestures beyond the canvas itself |
+| Checklist sidebar with ten onboarding tasks | Only Create a Note can complete. Progress persists in user defaults |
+| Bookmarks sidebar from the Import row of the plus menu | Stub only. It shows a not connected state, and its actions are disabled |
+| Missing on purpose | Bookmark accounts and sync, web clips, social providers, other importers, xAuth PKCE, toasts, gestures beyond the canvas itself |
 
 ## Where to extend
 

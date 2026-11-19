@@ -20,5 +20,8 @@
   {"kind": "key", "chars": "a", "keyCode": 0, "modifiers": ["command"]},
   {"kind": "clickControl", "name": "Download Selected Items"},
   {"kind": "wait", "ms": 300},
-  {"kind": "checkpoint", "path": "{{EVIDENCE}}/03-mixed-selection-export"}
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/03-mixed-selection-export"},
+  {"kind": "savePanel", "path": "{{EVIDENCE}}/mixed-image.png"},
+  {"kind": "wait", "ms": 100},
+  {"kind": "dumpState", "path": "{{EVIDENCE}}/04-after-image-save.json"}
 ]

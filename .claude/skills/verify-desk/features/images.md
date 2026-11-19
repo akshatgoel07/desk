@@ -37,7 +37,7 @@ Preconditions:
 
 - Overlapped cards: the click and the handle hit test use the top card. Read `handles` from `dumpState` after the selection, and start the drag on a handle frame. A drag that starts inside the card moves it.
 - Handles exist only for a single selected image. Note cards never have handles.
-- `savePanel` without an open panel fails the step. Download opens a panel only when the first selected card (in z order) is an image.
+- `savePanel` without an open panel fails the step. Download opens a panel only when the selection contains an image. With more than one image, complete one `savePanel` step for each image.
 - The save panel in verification mode is a stand-in. The step proves the app callback and the file write, not the system panel UI.
 - `pasteImage` uses a private pasteboard, so it does not change the user clipboard. The `pasteboard` text step does change it.
 - Images do not count toward the checklist. `Add an Image` stays unavailable.

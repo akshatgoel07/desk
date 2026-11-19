@@ -432,23 +432,27 @@ public final class MainController: NSViewController, NSMenuItemValidation, NSWin
         guard canvasView.finishEditing(), let window = view.window else { return }
         let notes = canvasView.notes.filter { canvasView.selection.contains($0.id) }
         guard !notes.isEmpty else { return }
-        if let image = notes.first?.image {
-            let panel = NSSavePanel()
-            panel.allowedContentTypes = image.contentType.map { [$0] } ?? []
-            panel.nameFieldStringValue = image.name
-            VerificationRuntime.presentSavePanel(panel, on: window) { url in
-                guard let url else { return }
-                do { try image.data.write(to: url, options: .atomic) }
-                catch { VerificationRuntime.presentSaveError(error, on: window) }
-            }
-            return
-        }
         do {
             for note in notes where note.kind == .note {
                 try note.content.exportMarkdown()
             }
         } catch {
             VerificationRuntime.presentSaveError(error, on: window)
+        }
+        saveImages(notes.compactMap(\.image), on: window)
+    }
+
+    private func saveImages(_ images: [ImageAttachment], on window: NSWindow) {
+        guard let image = images.first else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = image.contentType.map { [$0] } ?? []
+        panel.nameFieldStringValue = image.name
+        VerificationRuntime.presentSavePanel(panel, on: window) { [weak self] url in
+            if let url {
+                do { try image.data.write(to: url, options: .atomic) }
+                catch { VerificationRuntime.presentSaveError(error, on: window) }
+            }
+            self?.saveImages(Array(images.dropFirst()), on: window)
         }
     }
 
@@ -901,6 +905,8 @@ private final class CornerCapsule: NSButton {
     }
 
     override var acceptsFirstResponder: Bool { isEnabled }
+
+    override var canBecomeKeyView: Bool { isEnabled && !isHiddenOrHasHiddenAncestor }
 
     override func becomeFirstResponder() -> Bool {
         needsDisplay = true

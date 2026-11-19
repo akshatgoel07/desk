@@ -227,6 +227,30 @@ struct NoteBlockTests {
         #expect(content.blocks[2].runs == [NoteRun("Task")])
     }
 
+    @Test func markedTextCommitsAtTheCaretAndKeepsTheModelInSync() {
+        let view = editor()
+        let none = NSRange(location: NSNotFound, length: 0)
+        enter("abcd", in: view)
+        view.setSelectedRange(NSRange(location: 8, length: 0))
+        view.setMarkedText("\u{b4}", selectedRange: NSRange(location: 1, length: 0), replacementRange: none)
+        #expect(view.content.plainText == "Title\nabcd")
+        view.insertText("\u{e9}", replacementRange: none)
+        #expect(view.content.plainText == "Title\nab\u{e9}cd")
+        #expect(view.string == view.content.editorText)
+        view.setSelectedRange(NSRange(location: 7, length: 2))
+        view.setMarkedText("\u{b4}", selectedRange: NSRange(location: 1, length: 0), replacementRange: none)
+        view.unmarkText()
+        #expect(view.content.plainText == "Title\na\u{b4}cd")
+        #expect(view.string == view.content.editorText)
+        view.setSelectedRange(NSRange(location: 7, length: 2))
+        view.setMarkedText("\u{2c6}", selectedRange: NSRange(location: 1, length: 0), replacementRange: none)
+        view.setMarkedText("", selectedRange: NSRange(location: 0, length: 0), replacementRange: none)
+        #expect(view.content.plainText == "Title\na\u{b4}cd")
+        #expect(view.string == view.content.editorText)
+        view.undo(nil)
+        #expect(view.content.plainText == "Title\nab\u{e9}cd")
+    }
+
     @Test func formatRemovalKeepsNextEntryPlain() {
         let view = editor()
         enter("Words sample", in: view)

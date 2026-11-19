@@ -13,6 +13,7 @@ final class NoteTextView: NSTextView {
     private var marks: Set<NoteMark> = []
     private var typingEnd: Int?
     private var appliesEdit = false
+    private var markedBase: NSRange?
     var onExit: (() -> Bool)?
     var onContentChange: (() -> Void)?
     override var undoManager: UndoManager? { textUndoManager }
@@ -26,6 +27,7 @@ final class NoteTextView: NSTextView {
         self.content = content
         marks = []
         typingEnd = nil
+        markedBase = nil
         render(selection: NSRange(location: 0, length: 0))
         textUndoManager.removeAllActions()
         textUndoManager.groupsByEvent = false
@@ -89,9 +91,26 @@ final class NoteTextView: NSTextView {
         return super.validateMenuItem(menuItem)
     }
 
+    override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        if !hasMarkedText() { markedBase = replacementRange.location == NSNotFound ? self.selectedRange() : replacementRange }
+        textUndoManager.disableUndoRegistration()
+        super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacementRange)
+        textUndoManager.enableUndoRegistration()
+        if !hasMarkedText() {
+            markedBase = nil
+            render(selection: self.selectedRange())
+        }
+    }
+
+    override func unmarkText() {
+        guard hasMarkedText() else { return }
+        insertText((super.string as NSString).substring(with: markedRange()), replacementRange: NSRange(location: NSNotFound, length: 0))
+    }
+
     override func insertText(_ insertString: Any, replacementRange: NSRange) {
         let text = (insertString as? String) ?? (insertString as? NSAttributedString)?.string ?? ""
-        let selection = replacementRange.location == NSNotFound ? selectedRange() : replacementRange
+        let selection = markedBase ?? (replacementRange.location == NSNotFound ? selectedRange() : replacementRange)
+        markedBase = nil
         let activeMarks = marks
         edit(typing: !text.contains("\n")) { content in
             var caret = content.replace(selection, with: text, marks: activeMarks)

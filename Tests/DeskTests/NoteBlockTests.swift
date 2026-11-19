@@ -251,6 +251,31 @@ struct NoteBlockTests {
         #expect(view.content.plainText == "Title\nab\u{e9}cd")
     }
 
+    @Test func builtInTextCommandsEditTheModelWithoutUndoFailure() {
+        let view = editor()
+        enter("Groceries list", in: view)
+        view.deleteWordBackward(nil)
+        #expect(view.content.plainText == "Title\nGroceries ")
+        #expect(view.string == view.content.editorText)
+        view.setSelectedRange(NSRange(location: 0, length: 5))
+        view.delete(nil)
+        #expect(view.content.plainText == "\nGroceries ")
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.clearContents()
+        pasteboard.setString("milk", forType: .string)
+        view.setSelectedRange(NSRange(location: 11, length: 0))
+        _ = view.readSelection(from: pasteboard, type: .string)
+        #expect(view.content.plainText == "\nGroceries milk")
+        #expect(view.string == view.content.editorText)
+        view.undo(nil)
+        #expect(view.content.plainText == "\nGroceries ")
+        view.undo(nil)
+        #expect(view.content.plainText == "Title\nGroceries ")
+        view.undo(nil)
+        #expect(view.content.plainText == "Title\nGroceries list")
+    }
+
     @Test func formatRemovalKeepsNextEntryPlain() {
         let view = editor()
         enter("Words sample", in: view)

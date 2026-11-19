@@ -14,6 +14,7 @@ final class NoteTextView: NSTextView {
     private var typingEnd: Int?
     private var appliesEdit = false
     private var markedBase: NSRange?
+    private var marking = false
     var onExit: (() -> Bool)?
     var onContentChange: (() -> Void)?
     override var undoManager: UndoManager? { textUndoManager }
@@ -93,13 +94,27 @@ final class NoteTextView: NSTextView {
 
     override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         if !hasMarkedText() { markedBase = replacementRange.location == NSNotFound ? self.selectedRange() : replacementRange }
+        marking = true
         textUndoManager.disableUndoRegistration()
         super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacementRange)
         textUndoManager.enableUndoRegistration()
+        marking = false
         if !hasMarkedText() {
             markedBase = nil
             render(selection: self.selectedRange())
         }
+    }
+
+    override func shouldChangeText(inRanges affectedRanges: [NSValue], replacementStrings: [String]?) -> Bool {
+        if marking { return super.shouldChangeText(inRanges: affectedRanges, replacementStrings: replacementStrings) }
+        guard let replacementStrings else { return false }
+        let changes = zip(affectedRanges.map(\.rangeValue), replacementStrings).sorted { $0.0.location > $1.0.location }
+        edit { content in
+            var caret = 0
+            for (range, text) in changes { caret = content.replace(range, with: text) }
+            return NSRange(location: caret, length: 0)
+        }
+        return false
     }
 
     override func unmarkText() {

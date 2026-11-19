@@ -34,7 +34,7 @@ enum NoteBlockRendering {
             let base = attributes(style: block.style, scale: scale, color: color)
             if block.style.prefixLength > 0 {
                 let attachment = NSTextAttachment()
-                attachment.attachmentCell = NoteBlockAttachmentCell(style: block.style, checked: block.checked, scale: scale)
+                attachment.attachmentCell = NoteBlockAttachmentCell(style: block.style, checked: block.checked, scale: scale, color: color)
                 let marker = NSMutableAttributedString(attachment: attachment)
                 marker.addAttributes(base, range: NSRange(location: 0, length: marker.length))
                 result.append(marker)
@@ -55,11 +55,13 @@ private final class NoteBlockAttachmentCell: NSTextAttachmentCell {
     let style: NoteBlockStyle
     let checked: Bool
     let scale: CGFloat
+    let color: NSColor
 
-    init(style: NoteBlockStyle, checked: Bool, scale: CGFloat) {
+    init(style: NoteBlockStyle, checked: Bool, scale: CGFloat, color: NSColor) {
         self.style = style
         self.checked = checked
         self.scale = scale
+        self.color = color
         super.init(textCell: "")
     }
 
@@ -76,7 +78,9 @@ private final class NoteBlockAttachmentCell: NSTextAttachmentCell {
         } else {
             let rect = CGRect(x: cellFrame.minX, y: cellFrame.minY, width: 18 * scale, height: 18 * scale)
             let path = NSBezierPath(roundedRect: rect, xRadius: 5 * scale, yRadius: 5 * scale)
-            (checked ? NotePageTypography.textColor : NSColor(srgbRed: 61 / 255, green: 66 / 255, blue: 68 / 255, alpha: 1)).setFill()
+            let unchecked = color == NotePageTypography.textColor
+                ? NSColor(srgbRed: 61 / 255, green: 66 / 255, blue: 68 / 255, alpha: 1) : color.withAlphaComponent(0.12)
+            (checked ? color : unchecked).setFill()
             path.fill()
             if !checked {
                 NSColor.white.withAlphaComponent(0.12).setStroke()

@@ -1,0 +1,9 @@
+[
+  {"kind": "dumpState", "path": "{{EVIDENCE}}/01-before.json"},
+  {"kind": "clickControl", "name": "Board Settings"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/02-board-settings"},
+  {"kind": "clickControl", "name": "Desk Pro"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/03-after-desk-pro"}
+]

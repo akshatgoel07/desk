@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+uid=$(id -u)
+scratch_root=${DESK_VERIFY_SCRATCH_ROOT:-/private/tmp/claude-$uid/desk-verify-scratch}
+evidence_root=${DESK_VERIFY_EVIDENCE_ROOT:-/private/tmp/claude-$uid/desk-verify-evidence}
+
+killed=0
+for pidfile in "$scratch_root"/*/desk.pid; do
+  [[ -f $pidfile ]] || continue
+  pid=$(cat "$pidfile")
+  if kill -0 "$pid" 2> /dev/null && ps -p "$pid" -o command= | grep -q '/Desk$'; then
+    kill "$pid" 2> /dev/null
+    sleep 1
+    kill -9 "$pid" 2> /dev/null || true
+    killed=$((killed + 1))
+  fi
+  rm -f "$pidfile"
+done
+
+suites=0
+for plist in "$HOME"/Library/Preferences/desk.verify.*.plist; do
+  [[ -f $plist ]] || continue
+  suite=$(basename "$plist" .plist)
+  defaults delete "$suite" > /dev/null 2>&1 || true
+  rm -f "$plist"
+  suites=$((suites + 1))
+done
+
+dirs=0
+if [[ -d $scratch_root ]]; then
+  for dir in "$scratch_root"/*; do
+    [[ -e $dir ]] || continue
+    rm -rf "$dir"
+    dirs=$((dirs + 1))
+  done
+fi
+
+echo "cleanup: killed $killed processes, removed $suites defaults suites, removed $dirs scratch folders"
+echo "cleanup: evidence kept at $evidence_root"
+ls "$evidence_root" 2> /dev/null | sed 's/^/  /'

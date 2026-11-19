@@ -1,0 +1,12 @@
+[
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/01-load-error"},
+  {"kind": "key", "chars": "n", "keyCode": 45, "modifiers": ["command"]},
+  {"kind": "dumpState", "path": "{{EVIDENCE}}/02-create-blocked.json"},
+  {"kind": "wait", "ms": 2500},
+  {"kind": "clickControl", "name": "Retry"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/03-retry-recovers-empty"},
+  {"kind": "menu", "name": "Add Sample Notes"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/04-samples-populated"}
+]

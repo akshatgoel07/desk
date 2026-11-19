@@ -1,0 +1,22 @@
+[
+  {"kind": "clickControl", "name": "Add Content"},
+  {"kind": "wait", "ms": 700},
+  {"kind": "hoverControl", "name": "Import"},
+  {"kind": "wait", "ms": 200},
+  {"kind": "snapshot", "path": "{{EVIDENCE}}/01-import-submenu.png"},
+  {"kind": "clickControl", "name": "Bookmarks from"},
+  {"kind": "wait", "ms": 500},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/02-bookmarks-sidebar"},
+  {"kind": "axDump", "path": "{{EVIDENCE}}/02-ax.json"},
+  {"kind": "clickControl", "name": "Close bookmarks"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/03-closed-by-button"},
+  {"kind": "clickControl", "name": "Add Content"},
+  {"kind": "wait", "ms": 700},
+  {"kind": "hoverControl", "name": "Import"},
+  {"kind": "clickControl", "name": "Bookmarks from"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "key", "chars": "\u001b", "keyCode": 53},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/04-closed-by-escape"}
+]

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+[[ $# -ge 1 && -f $1 ]] || { echo "Usage: summarize-state <dumpState.json>" >&2; exit 2; }
+
+jq '{
+  state,
+  saveError,
+  paywallPresented,
+  checklistCounter: ([.buttons[] | select(.name == "Checklist") | .title] | first),
+  preferences,
+  currentSpace: (.currentSpaceID as $c | [.spaces[] | select(.id == $c) | .name] | first),
+  spaces: [.spaces[].name],
+  notes: [.notes[] | {id: .id[0:8], kind, text: (.text | if length > 60 then .[0:60] + "..." else . end), frame, imageBytes}],
+  selection: [.selection[] | .[0:8]],
+  focus,
+  gesture,
+  viewport: {scale: .viewport.scale, translation: .viewport.translation, cameraAnimating: .viewport.cameraAnimating},
+  editor: {destination: .editor.destination, blocks: [.editorContent.blocks[]? | {style, checked, runs: [.runs[] | {text, marks}]}]},
+  undo,
+  contentActionBar: .contentActionBar.visible,
+  savePanelPending: .window.savePanelPending,
+  savePanelError: .window.savePanelError,
+  windowTitle: .window.title,
+  windowSize: {w: .window.w, h: .window.h},
+  buttons: [.buttons[] | select(.name != "Button") | "\(.name)\(if .enabled then "" else " (disabled)" end)\(if .focused then " (focused)" else "" end)"],
+  labels: [.labels[] | .text | select(length > 0)]
+}' "$1"

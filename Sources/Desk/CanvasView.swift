@@ -83,6 +83,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
         set { targetViewport = newValue }
     }
     public var magnification: CGFloat { viewport.scale }
+    private(set) var isApplyingFrames = false
     private var pinchStart: Viewport?
     var isPinching: Bool { pinchStart != nil }
     private var cameraTimer: Timer?
@@ -391,9 +392,11 @@ public final class CanvasView: NSView, NSMenuItemValidation {
                 fittedFrames[notes[index].id] = fitted
             }
         }
+        isApplyingFrames = true
         for view in itemViews {
             if let frame = fittedFrames[view.id], view.frame != frame { view.frame = frame }
         }
+        isApplyingFrames = false
         updateSelectionOverlay()
         CATransaction.commit()
     }
@@ -487,7 +490,9 @@ public final class CanvasView: NSView, NSMenuItemValidation {
                 if let previous, let index = notes.firstIndex(where: { $0.id == note.id }) {
                     notes[index] = note
                     let view = itemViews.first { $0.id == note.id }
+                    isApplyingFrames = true
                     view?.frame = note.frame
+                    isApplyingFrames = false
                     view?.applyColor()
                     inverse.insert(.update(previous), at: 0)
                 }

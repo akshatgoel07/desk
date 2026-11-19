@@ -33,4 +33,34 @@ struct AnimationPerformanceTests {
         #expect(CanvasItemView.thumbnailPixels(needed: 300, source: source)
             == CanvasItemView.thumbnailPixels(needed: 500, source: source))
     }
+
+    @Test func groupDragMovesEveryCardWithoutRelayout() throws {
+        let (canvas, window, records) = try canvas(notes: 40)
+        defer { window.contentView = nil }
+        canvas.select(Set(records.map(\.id)))
+        let moved = Dictionary(uniqueKeysWithValues: records.map { ($0.id, $0.frame.offsetBy(dx: 37, dy: -11)) })
+        canvas.previewFrames(moved)
+        for view in canvas.itemViews {
+            #expect(view.frame == moved[view.id])
+            #expect(!view.needsLayout)
+        }
+        #expect(canvas.notes.allSatisfy { $0.frame == moved[$0.id] })
+        let union = moved.values.reduce(CGRect.null) { $0.union($1) }
+        let outline = try #require(canvas.overlayLayer.path).boundingBoxOfPath
+        let expected = canvas.viewRect(fromCanvas: union).insetBy(dx: -1, dy: -1)
+        #expect(abs(outline.minX - expected.minX) < 0.001)
+        #expect(abs(outline.maxY - expected.maxY) < 0.001)
+    }
+
+    @Test func externalFrameChangesStillReachTheModelAndResizeRelayouts() throws {
+        let (canvas, window, records) = try canvas(notes: 3)
+        defer { window.contentView = nil }
+        let view = try #require(canvas.itemViews.first { $0.id == records[1].id })
+        view.frame = view.frame.offsetBy(dx: 12, dy: 8)
+        #expect(canvas.notes.first { $0.id == records[1].id }?.frame == view.frame)
+        #expect(!view.needsLayout)
+        view.frame.size = CGSize(width: 180, height: 220)
+        #expect(view.needsLayout)
+        #expect(canvas.notes.first { $0.id == records[1].id }?.frame.size == CGSize(width: 180, height: 220))
+    }
 }

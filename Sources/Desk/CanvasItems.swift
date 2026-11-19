@@ -67,7 +67,8 @@ public final class CanvasItemView: NSView {
 
     override public var frame: NSRect {
         didSet {
-            needsLayout = true
+            if frame.size != oldValue.size { needsLayout = true }
+            guard canvas?.isApplyingFrames != true else { return }
             canvas?.updateFrame(id: id, frame: frame)
         }
     }

@@ -257,4 +257,36 @@ struct NoteStoreTests {
         context.persistentStoreCoordinator = coordinator
         #expect(try context.count(for: NSFetchRequest<ItemMO>(entityName: "Item")) == 2)
     }
+
+    @Test func truncatedStoreReportsAReadableMessage() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("notes.sqlite")
+        try autoreleasepool {
+            let model = CoreDataStack.makeModel()
+            let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
+            let persistentStore = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: url,
+                options: [NSSQLitePragmasOption: ["journal_mode": "DELETE"]])
+            let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+            context.persistentStoreCoordinator = coordinator
+            for index in 0..<40 {
+                let canvas = CanvasMO(entity: model.entitiesByName["Canvas"]!, insertInto: context)
+                canvas.identifier = UUID()
+                canvas.title = String(repeating: "Board \(index) ", count: 60)
+                canvas.index = Int64(index)
+                canvas.lastSeen = 0
+            }
+            try context.save()
+            try coordinator.remove(persistentStore)
+        }
+        let bytes = try Data(contentsOf: url)
+        try #require(bytes.count > 12_288)
+        try bytes.prefix(12_288).write(to: url)
+        guard case .failure(let error) = NoteStore(storeURL: url).load() else {
+            Issue.record("A truncated store must return a load failure.")
+            return
+        }
+        #expect(error.message == "Cannot access the note store. The store file is damaged or cannot be read.")
+    }
 }

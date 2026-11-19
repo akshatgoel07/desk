@@ -410,7 +410,15 @@ public final class NoteStore {
             return .success(try action(openContext()))
         } catch {
             context?.rollback()
-            return .failure(error as? NoteStoreError ?? .storage(error.localizedDescription))
+            if let error = error as? NoteStoreError { return .failure(error) }
+            let error = error as NSError
+            guard error.domain == NSSQLiteErrorDomain else { return .failure(.storage(error.localizedDescription)) }
+            switch error.code {
+            case 13: return .failure(.storage("The disk is full."))
+            case 8, 23: return .failure(.storage("Desk does not have permission to change the store file."))
+            case 14: return .failure(.storage("Desk cannot open the store file."))
+            default: return .failure(.storage("The store file is damaged or cannot be read."))
+            }
         }
     }
 

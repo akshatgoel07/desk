@@ -13,7 +13,8 @@ enum NoteBlockRendering {
         paragraph.tabStops = (1...20).map { NSTextTab(textAlignment: .left, location: CGFloat($0 * 33 + (style.prefixLength == 0 ? 0 : 32)) * scale) }
         paragraph.defaultTabInterval = 33 * scale
         var font = NotePageTypography.font(size: style.fontSize * scale,
-                                          weight: marks.contains(.bold) ? .semibold : style.fontSize > 16 ? .medium : .regular)
+                                          weight: marks.contains(.bold) ? .semibold : style.fontSize > 16 ? .medium : .regular,
+                                          heading: style.fontSize > 16)
         if marks.contains(.italic) { font = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask) }
         var result: [NSAttributedString.Key: Any] = [
             .font: font, .foregroundColor: color.withAlphaComponent(marks.contains(.strikethrough) ? 0.88 : 1),

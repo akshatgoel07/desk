@@ -25,4 +25,14 @@ struct NotePageTypographyTests {
         #expect(lastParagraph == body)
         #expect(text.attribute(.foregroundColor, at: 6, effectiveRange: nil) as? NSColor == NotePageTypography.textColor)
     }
+
+    @Test func mixedFontUsesSansHeadingsAndMonoBody() throws {
+        guard AppPreferences.shared.noteFont == .mixed else { return }
+        for style in NoteBlockStyle.allCases {
+            for scale in [1.0, 1.0 / 6.0] {
+                let font = try #require(NoteBlockRendering.attributes(style: style, scale: scale)[.font] as? NSFont)
+                #expect(font.isFixedPitch == (style.fontSize <= 16))
+            }
+        }
+    }
 }

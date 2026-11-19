@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+skill_dir=$(cd "$(dirname "$0")/.." && pwd)
+repo=$(cd "$skill_dir/../../.." && pwd)
+binary=${DESK_BINARY:-$repo/.build/debug/Desk}
+uid=$(id -u)
+evidence_root=${DESK_VERIFY_EVIDENCE_ROOT:-/private/tmp/claude-$uid/desk-verify-evidence}
+scratch_root=${DESK_VERIFY_SCRATCH_ROOT:-/private/tmp/claude-$uid/desk-verify-scratch}
+failures=0
+
+pass() { echo "PASS $1"; }
+fail() { echo "FAIL $1"; failures=$((failures + 1)); }
+
+major=$(sw_vers -productVersion | cut -d. -f1)
+if (( major >= 15 )); then pass "macOS $(sw_vers -productVersion)"; else fail "macOS $(sw_vers -productVersion) is older than 15"; fi
+
+if command -v swift > /dev/null; then pass "$(swift --version 2>&1 | head -1)"; else fail "swift toolchain not on PATH"; fi
+command -v jq > /dev/null && pass "jq present" || fail "jq missing"
+
+if [[ -x $binary ]]; then
+  newer=$(find "$repo/Sources" "$repo/Package.swift" -newer "$binary" -type f 2> /dev/null | head -3)
+  if [[ -z $newer ]]; then
+    pass "binary $binary is newer than every source file"
+  else
+    fail "binary is stale. Newer sources: $(echo "$newer" | tr '\n' ' '). Run: swift build --package-path $repo"
+  fi
+else
+  fail "binary missing at $binary. Run: swift build --package-path $repo"
+fi
+
+if [[ -n ${DESK_STORE_URL:-} ]]; then
+  fail "DESK_STORE_URL is set in this shell ($DESK_STORE_URL). Unset it. run-steps sets its own store."
+else
+  pass "no DESK_STORE_URL in this shell"
+fi
+
+stray=0
+for pidfile in "$scratch_root"/*/desk.pid; do
+  [[ -f $pidfile ]] || continue
+  pid=$(cat "$pidfile")
+  if kill -0 "$pid" 2> /dev/null; then
+    echo "     stray verification process $pid from $pidfile"
+    stray=$((stray + 1))
+  fi
+done
+if (( stray == 0 )); then pass "no stray verification processes from earlier runs"; else fail "$stray stray verification processes. Run scripts/cleanup"; fi
+
+mkdir -p "$evidence_root" 2> /dev/null && [[ -w $evidence_root ]] && pass "evidence root $evidence_root is writable" || fail "evidence root $evidence_root is not writable"
+
+if (( failures > 0 )); then
+  echo "doctor: $failures static checks failed. Smoke run skipped."
+  exit 1
+fi
+
+run=doctor-$(date +%Y%m%d-%H%M%S)-$$
+tmp=$(mktemp -t desk-doctor)
+printf '[{"kind":"dumpState","path":"{{EVIDENCE}}/state.json"},{"kind":"snapshot","path":"{{EVIDENCE}}/empty.png"}]\n' > "$tmp"
+if "$skill_dir/scripts/run-steps" "$run" "$tmp" --timeout 30 --no-bisect > /dev/null; then
+  state=$evidence_root/$run/state.json
+  check=$(jq -r '[.state == "empty", .window.headless == true, .window.alpha == 0, .window.processActive == false, (.notes | length) == 0, .canvasAttached == true] | all' "$state")
+  if [[ $check == true ]]; then
+    pass "smoke run: empty canvas, headless invisible window, focus not taken ($evidence_root/$run)"
+  else
+    fail "smoke run state is unexpected. Read $state"
+  fi
+else
+  fail "smoke run failed. Read $evidence_root/$run/log.txt"
+fi
+rm -f "$tmp"
+
+if (( failures > 0 )); then echo "doctor: FAIL"; exit 1; fi
+echo "doctor: OK"

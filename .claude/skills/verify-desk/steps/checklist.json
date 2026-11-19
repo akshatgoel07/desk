@@ -1,0 +1,21 @@
+[
+  {"kind": "dumpState", "path": "{{EVIDENCE}}/01-counter-start.json"},
+  {"kind": "clickControl", "name": "Checklist"},
+  {"kind": "wait", "ms": 1000},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/02-sidebar-open"},
+  {"kind": "clickControl", "name": "Colors"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "snapshot", "path": "{{EVIDENCE}}/03-colors-collapsed.png"},
+  {"kind": "axDump", "path": "{{EVIDENCE}}/03-ax.json"},
+  {"kind": "clickControl", "name": "Close checklist"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "key", "chars": "n", "keyCode": 45, "modifiers": ["command"]},
+  {"kind": "wait", "ms": 300},
+  {"kind": "dumpState", "path": "{{EVIDENCE}}/04-counter-after-note.json"},
+  {"kind": "clickControl", "name": "Checklist"},
+  {"kind": "wait", "ms": 1000},
+  {"kind": "snapshot", "path": "{{EVIDENCE}}/05-create-note-checked.png"},
+  {"kind": "key", "chars": "\u001b", "keyCode": 53},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/06-escape-closes"}
+]

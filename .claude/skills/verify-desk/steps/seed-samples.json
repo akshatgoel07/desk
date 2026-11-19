@@ -1,0 +1,5 @@
+[
+  {"kind": "menu", "name": "Add Sample Notes"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/seeded"}
+]

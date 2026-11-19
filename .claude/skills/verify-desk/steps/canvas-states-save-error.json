@@ -1,0 +1,9 @@
+[
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/01-read-only-store-loaded"},
+  {"kind": "key", "chars": "n", "keyCode": 45, "modifiers": ["command"]},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/02-save-error"},
+  {"kind": "clickControl", "name": "Dismiss"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/03-dismissed"}
+]

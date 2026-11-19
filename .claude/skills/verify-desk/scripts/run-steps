@@ -1,0 +1,237 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: run-steps <run-name> <steps.json> [options]
+
+Runs one Desk driver script in a fresh, isolated process and keeps the evidence.
+
+Options:
+  --store <path>     Reuse this sqlite store instead of a fresh one (restart and persistence proofs).
+  --suite <name>     Reuse this user defaults suite instead of a fresh one.
+  --keep             Keep the fresh store and suite after the run. The script prints their names.
+  --timeout <sec>    Kill the Desk process after this many seconds. Default 120.
+  --no-bisect        Do not search for the failing step when the driver exits non-zero.
+                     The search does not repeat --at or --read-only-store. For those runs, its result is a hint.
+  --broken-store     Write a non-sqlite file at the fresh store path before launch (load error state).
+  --read-only-store  With --store: make the store files read-only for the run, then restore them (save error state).
+  --at <sec> <cmd>   Run <cmd> with bash after <sec> seconds while Desk runs. STORE and EVIDENCE are exported.
+
+Placeholders in the steps file:
+  {{EVIDENCE}}  absolute evidence folder for this run
+  {{FIXTURES}}  absolute fixtures folder of the skill
+  {{STORE}}     absolute sqlite store path for this run
+
+Environment:
+  DESK_VERIFY_EVIDENCE_ROOT  default /private/tmp/claude-<uid>/desk-verify-evidence
+  DESK_VERIFY_SCRATCH_ROOT   default /private/tmp/claude-<uid>/desk-verify-scratch
+  DESK_BINARY                default <repo>/.build/debug/Desk
+USAGE
+}
+
+[[ $# -ge 2 ]] || { usage; exit 2; }
+name=$1
+steps=$2
+shift 2
+[[ $name =~ ^[A-Za-z0-9._-]+$ ]] || { echo "run-steps: run name must match [A-Za-z0-9._-]+" >&2; exit 2; }
+[[ -f $steps ]] || { echo "run-steps: steps file not found: $steps" >&2; exit 2; }
+
+store=""
+suite=""
+keep=0
+timeout=120
+bisect=1
+broken=0
+hook_delay=""
+hook_command=""
+read_only=0
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --store) store=$2; shift 2 ;;
+    --suite) suite=$2; shift 2 ;;
+    --keep) keep=1; shift ;;
+    --timeout) timeout=$2; shift 2 ;;
+    --no-bisect) bisect=0; shift ;;
+    --broken-store) broken=1; shift ;;
+    --read-only-store) read_only=1; shift ;;
+    --at) hook_delay=$2; hook_command=$3; shift 3 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "run-steps: unknown option $1" >&2; exit 2 ;;
+  esac
+done
+
+skill_dir=$(cd "$(dirname "$0")/.." && pwd)
+repo=$(cd "$skill_dir/../../.." && pwd)
+binary=${DESK_BINARY:-$repo/.build/debug/Desk}
+uid=$(id -u)
+evidence_root=${DESK_VERIFY_EVIDENCE_ROOT:-/private/tmp/claude-$uid/desk-verify-evidence}
+scratch_root=${DESK_VERIFY_SCRATCH_ROOT:-/private/tmp/claude-$uid/desk-verify-scratch}
+stamp=$(date +%Y%m%d-%H%M%S)-$$
+evidence=$evidence_root/$name
+scratch=$scratch_root/$name-$stamp
+
+[[ -x $binary ]] || { echo "run-steps: binary missing at $binary. Run swift build in $repo." >&2; exit 2; }
+if [[ -e $evidence ]]; then
+  echo "run-steps: evidence folder $evidence exists. Use a new run name. Evidence is never overwritten." >&2
+  exit 2
+fi
+mkdir -p "$evidence" "$scratch"
+
+fresh_store=0
+if [[ -z $store ]]; then
+  store=$scratch/store.sqlite
+  fresh_store=1
+  if [[ $broken == 1 ]]; then
+    printf 'this is not a sqlite store\n' > "$store"
+  fi
+else
+  [[ $store == /* ]] || { echo "run-steps: --store needs an absolute path" >&2; exit 2; }
+fi
+if [[ $read_only == 1 && ( $fresh_store == 1 || ! -f $store ) ]]; then
+  echo "run-steps: --read-only-store needs --store with an existing store. Seed one with --keep first." >&2
+  exit 2
+fi
+fresh_suite=0
+if [[ -z $suite ]]; then
+  suite=desk.verify.$name.$stamp
+  fresh_suite=1
+fi
+
+render() {
+  sed -e "s#{{EVIDENCE}}#$evidence#g" -e "s#{{FIXTURES}}#$skill_dir/fixtures#g" -e "s#{{STORE}}#$store#g" "$1"
+}
+render "$steps" > "$evidence/steps.json"
+jq -e 'type == "array"' "$evidence/steps.json" > /dev/null || { echo "run-steps: steps file is not a JSON array" >&2; exit 2; }
+
+exports_before=$scratch/exports-before.txt
+find "$HOME/Downloads" -maxdepth 2 -path '*Desk Export*' -type f 2>/dev/null | sort > "$exports_before" || true
+
+{
+  echo "run=$name"
+  echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "binary=$binary"
+  echo "binary_mtime=$(stat -f %Sm -t %Y-%m-%dT%H:%M:%S "$binary")"
+  echo "git_rev=$(git -C "$repo" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  echo "store=$store"
+  echo "suite=$suite"
+  echo "scratch=$scratch"
+  echo "steps_source=$(cd "$(dirname "$steps")" && pwd)/$(basename "$steps")"
+} > "$evidence/meta.txt"
+
+launch() {
+  local script=$1 log=$2 run_store=$3 run_suite=$4
+  DESK_STORE_URL=$run_store DESK_DEFAULTS_SUITE=$run_suite DESK_VERIFY_SCRIPT=$script \
+    "$binary" > "$log" 2>&1 &
+  local pid=$!
+  echo "$pid" > "$scratch/desk.pid"
+  local waited=0
+  while kill -0 "$pid" 2> /dev/null; do
+    if (( waited >= timeout * 10 )); then
+      kill "$pid" 2> /dev/null || true
+      sleep 1
+      kill -9 "$pid" 2> /dev/null || true
+      wait "$pid" 2> /dev/null || true
+      rm -f "$scratch/desk.pid"
+      echo "timeout"
+      return 0
+    fi
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  local code=0
+  wait "$pid" || code=$?
+  rm -f "$scratch/desk.pid"
+  echo "$code"
+}
+
+store_backup=""
+if [[ $fresh_store == 0 && -f $store ]]; then
+  store_backup=$scratch/store-before
+  mkdir -p "$store_backup"
+  for suffix in "" -wal -shm; do
+    [[ -f $store$suffix ]] && cp "$store$suffix" "$store_backup/store.sqlite$suffix"
+  done
+fi
+if [[ $broken == 1 ]]; then
+  store_backup=$scratch/store-before
+  mkdir -p "$store_backup"
+  cp "$store" "$store_backup/store.sqlite"
+fi
+
+if [[ $read_only == 1 ]]; then
+  chmod 444 "$store"*
+  echo "read_only_store=1" >> "$evidence/meta.txt"
+fi
+hook_pid=""
+if [[ -n $hook_command ]]; then
+  echo "hook=at ${hook_delay}s: $hook_command" >> "$evidence/meta.txt"
+  ( sleep "$hook_delay"; STORE=$store EVIDENCE=$evidence bash -c "$hook_command" >> "$evidence/hook.log" 2>&1 ) &
+  hook_pid=$!
+fi
+result=$(launch "$evidence/steps.json" "$evidence/log.txt" "$store" "$suite")
+[[ $read_only == 1 ]] && chmod 644 "$store"*
+if [[ -n $hook_pid ]]; then
+  kill "$hook_pid" 2> /dev/null || true
+  wait "$hook_pid" 2> /dev/null || true
+fi
+echo "$result" > "$evidence/exit-code"
+echo "finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$evidence/meta.txt"
+echo "exit=$result" >> "$evidence/meta.txt"
+
+find "$HOME/Downloads" -maxdepth 2 -path '*Desk Export*' -type f 2>/dev/null | sort > "$scratch/exports-after.txt" || true
+new_exports=$(comm -13 "$exports_before" "$scratch/exports-after.txt" || true)
+if [[ -n $new_exports ]]; then
+  mkdir -p "$evidence/exports"
+  while IFS= read -r file; do
+    [[ -n $file ]] || continue
+    cp "$file" "$evidence/exports/"
+    echo "$file" >> "$evidence/exports/created-paths.txt"
+    rm -f "$file"
+    rmdir "$(dirname "$file")" 2> /dev/null || true
+  done <<< "$new_exports"
+fi
+
+if [[ $result != 0 && $bisect == 1 ]]; then
+  total=$(jq length "$evidence/steps.json")
+  low=1
+  high=$total
+  probe_index=0
+  while (( low < high )); do
+    mid=$(( (low + high) / 2 ))
+    probe_index=$((probe_index + 1))
+    probe=$scratch/bisect-$probe_index
+    mkdir -p "$probe/evidence"
+    probe_store=$probe/store.sqlite
+    if [[ -n $store_backup ]]; then
+      for suffix in "" -wal -shm; do
+        [[ -f $store_backup/store.sqlite$suffix ]] && cp "$store_backup/store.sqlite$suffix" "$probe_store$suffix"
+      done
+    fi
+    jq --argjson n "$mid" '.[0:$n]' "$evidence/steps.json" | sed -e "s#$evidence#$probe/evidence#g" -e "s#$store#$probe_store#g" > "$probe/steps.json"
+    code=$(launch "$probe/steps.json" "$probe/log.txt" "$probe_store" "desk.verify.bisect.$stamp.$probe_index")
+    defaults delete "desk.verify.bisect.$stamp.$probe_index" > /dev/null 2>&1 || true
+    rm -f "$HOME/Library/Preferences/desk.verify.bisect.$stamp.$probe_index.plist"
+    if [[ $code == 0 ]]; then low=$((mid + 1)); else high=$mid; fi
+  done
+  index=$((low - 1))
+  {
+    echo "first_failing_step_index=$index"
+    echo "first_failing_step=$(jq -c --argjson i "$index" '.[$i]' "$evidence/steps.json")"
+  } | tee "$evidence/failing-step.txt"
+  find "$HOME/Downloads" -maxdepth 2 -path '*Desk Export*' -type f 2>/dev/null | sort > "$scratch/exports-bisect.txt" || true
+  comm -13 "$scratch/exports-after.txt" "$scratch/exports-bisect.txt" | while IFS= read -r file; do
+    [[ -n $file ]] && rm -f "$file" && rmdir "$(dirname "$file")" 2> /dev/null || true
+  done
+fi
+
+if [[ $keep == 0 ]]; then
+  [[ $fresh_suite == 1 ]] && { defaults delete "$suite" > /dev/null 2>&1 || true; rm -f "$HOME/Library/Preferences/$suite.plist"; }
+  rm -rf "$scratch"
+else
+  echo "kept: store=$store suite=$suite scratch=$scratch"
+fi
+
+echo "evidence: $evidence"
+echo "exit: $result"
+[[ $result == 0 ]]

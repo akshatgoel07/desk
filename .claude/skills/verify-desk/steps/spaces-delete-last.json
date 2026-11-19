@@ -1,0 +1,23 @@
+[
+  {"kind": "key", "chars": "n", "keyCode": 45, "modifiers": ["command"]},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/01-only-space-with-note"},
+  {"kind": "clickControl", "name": "Board Settings"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "clickControl", "name": "Delete Space"},
+  {"kind": "wait", "ms": 200},
+  {"kind": "clickControl", "name": "Confirm Delete Space"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/02-replaced-by-new-space01"},
+  {"kind": "key", "chars": "z", "keyCode": 6, "modifiers": ["command"]},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/03-undo-restores"},
+  {"kind": "clickControl", "name": "Board Settings"},
+  {"kind": "wait", "ms": 300},
+  {"kind": "clickControl", "name": "Edit Space"},
+  {"kind": "wait", "ms": 200},
+  {"kind": "text", "text": "Draft"},
+  {"kind": "key", "chars": "\u001b", "keyCode": 53},
+  {"kind": "wait", "ms": 300},
+  {"kind": "checkpoint", "path": "{{EVIDENCE}}/04-escape-cancels-rename"}
+]

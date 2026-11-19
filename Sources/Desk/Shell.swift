@@ -901,6 +901,8 @@ private final class CornerCapsule: NSButton {
 
     override var acceptsFirstResponder: Bool { isEnabled }
 
+    override var canBecomeKeyView: Bool { isEnabled && !isHiddenOrHasHiddenAncestor }
+
     override func becomeFirstResponder() -> Bool {
         needsDisplay = true
         return super.becomeFirstResponder()

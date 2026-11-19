@@ -6,7 +6,7 @@ The user moves focus between notes with Tab and the arrow keys, and opens the fo
 
 - `kbd-tab-notes` focuses and selects the next note in z order with Tab, and the previous one with Shift-Tab.
 - `kbd-arrows` focuses the next note with Right or Down, and the previous note with Left or Up.
-- `kbd-tab-exit` moves focus out of the canvas after the last note.
+- `kbd-tab-exit` moves focus to `Add Content` after the last note. The next Tab moves focus to the canvas, and the Tab after that focuses the first note again.
 - `kbd-control-space` presses a focused corner control with Space.
 - `ax-tree` shows the `Canvas` group, its value (the selected note text, or "No selected notes"), and one `AXGroup` child for each note with `AXPress` and `AXPick`.
 - `ax-press` focuses and selects a note.
@@ -27,8 +27,8 @@ Preconditions:
 
 - **Tab to the first note.** Run `scripts/run-steps keyboard-a steps/keyboard-accessibility.json`. `01-tab-focuses-first-note.json` has focus `CanvasItemView`, `focusedNote` equal to the first note, and that note selected. The PNG shows the focus ring.
 - **Arrow.** Right. `02-arrow-right.json` has the second note focused and selected.
-- **Tab past the last note.** `03-tab-leaves-canvas.json` has focus `Window`, no focused note, and no focused button.
-- **Space.** `04-space-presses-focused-control.json` shows no change, because no control has focus.
+- **Tab past the last note.** `03-tab-leaves-canvas.json` has focus `CornerCapsule`, no focused note, and `Add Content` as the focused button. The PNG shows the focus ring on `Add Content`.
+- **Space.** `04-space-presses-focused-control.json` has focus `ContentMenuOverlay`, because Space pressed `Add Content` and the plus menu opened. The Escape step closes the menu.
 - **Accessibility tree.** `05-ax.json` has the `Canvas` group with two `AXGroup` children labeled with the note text, each with `["AXPress","AXPick"]`, and buttons labeled `Board Settings`, `Checklist`, `Spaces`, `Add Content`, `Download Selected Items`, and `Move to Folder` (disabled).
 - **Press.** `axAction` `press` on `A place for your ideas.`. `06-ax-press.json` has that note focused and selected.
 - **Pick.** `axAction` `pick`. `07-ax-pick-opens-editor.json` has `editor.destination` `page` and focus `NoteTextView`.
@@ -36,7 +36,7 @@ Preconditions:
 
 ## Gotchas
 
-- With keyboard navigation off, the corner controls are not in the Tab order. The Tab order is note 1, note 2, ..., the window itself (no visible focus), then the canvas again. ACCEPTANCE.md X1 describes control focus in the order. That needs keyboard navigation on, or `focusControl`.
+- The Tab order is note 1, note 2, ..., `Add Content`, the canvas, then note 1 again. This order is the same with macOS Keyboard navigation on or off. The other corner controls are not in the Tab order. Use `focusControl` to focus them.
 - `axAction` matches the note label exactly. The label is the full note text, or `Empty note`.
 - The `axDump` tree has the canvas children only while the main window is the driver window.
 - VoiceOver speech is out of scope. The dump proves names, roles, values, and actions only.

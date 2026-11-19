@@ -75,4 +75,29 @@ struct AnimationPerformanceTests {
         #expect(abs(outline.width - expected.width) < 0.001)
         #expect(canvas.accessibilityValue() as? String == "Note 5")
     }
+
+    @Test func quickZoomCommandsCompoundFromTheTargetAndAnimateFromThePresentedValue() throws {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        let (canvas, window, _) = try canvas(notes: 4)
+        defer { window.contentView = nil }
+        canvas.zoomOut(nil)
+        #expect(canvas.isCameraAnimating)
+        #expect(abs(canvas.cameraTarget.scale - 0.8) < 0.000001)
+        CATransaction.flush()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+        let presented = canvas.viewport.scale
+        #expect(presented < 1 && presented > 0.8)
+        canvas.zoomOut(nil)
+        #expect(abs(canvas.cameraTarget.scale - 0.64) < 0.000001)
+        let layer = try #require(canvas.subviews.compactMap(\.layer).first { $0.animation(forKey: "study.camera") != nil })
+        let animation = try #require(layer.animation(forKey: "study.camera") as? CABasicAnimation)
+        let target = try #require(animation.toValue as? NSValue).caTransform3DValue
+        #expect(abs(target.m11 - 0.64) < 0.000001)
+        let start = try #require(animation.fromValue as? NSValue).caTransform3DValue
+        #expect(start.m11 <= presented + 0.000001 && start.m11 > 0.8 - 0.05)
+        canvas.zoomIn(nil)
+        #expect(abs(canvas.cameraTarget.scale - 0.8) < 0.000001)
+        canvas.actualSize(nil)
+        #expect(canvas.cameraTarget.scale == 1)
+    }
 }

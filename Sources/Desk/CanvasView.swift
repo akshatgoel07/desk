@@ -852,14 +852,14 @@ public final class CanvasView: NSView, NSMenuItemValidation {
     }
 
     private func zoomCamera(to scale: CGFloat) {
-        var target = viewport
+        var target = targetViewport
         target.zoom(to: scale, around: CGPoint(x: bounds.midX, y: bounds.midY))
         moveCamera(to: target)
     }
 
-    @objc func zoomIn(_ sender: Any?) { zoomCamera(to: viewport.scale * 1.25) }
+    @objc func zoomIn(_ sender: Any?) { zoomCamera(to: targetViewport.scale * 1.25) }
 
-    @objc func zoomOut(_ sender: Any?) { zoomCamera(to: viewport.scale / 1.25) }
+    @objc func zoomOut(_ sender: Any?) { zoomCamera(to: targetViewport.scale / 1.25) }
 
     @objc func actualSize(_ sender: Any?) { zoomCamera(to: 1) }
 

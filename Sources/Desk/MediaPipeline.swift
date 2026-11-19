@@ -55,8 +55,8 @@ public final class FFmpegConverter {
         let pipe = Pipe()
         proc.standardOutput = pipe
         try? proc.run()
-        while proc.isRunning { usleep(20_000) }
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        while proc.isRunning { usleep(20_000) }
         let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         let streams = root?["streams"] as? [[String: Any]] ?? []
         let duration = (streams.first?["duration"] as? String).flatMap(Double.init) ?? 0

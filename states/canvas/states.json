@@ -1,0 +1,59 @@
+[
+  {
+    "group": "Board content",
+    "states": [
+      { "name": "empty", "title": "Empty board" },
+      { "name": "first-note", "title": "One note", "fixture": "first-note" },
+      { "name": "samples", "title": "Sample notes", "fixture": "samples" },
+      { "name": "typical", "title": "Weekly board", "fixture": "typical" },
+      { "name": "long-notes", "title": "Long notes", "fixture": "long-notes" },
+      { "name": "tasks", "title": "Task lists", "fixture": "tasks" },
+      { "name": "images", "title": "Image cards", "fixture": "images" },
+      { "name": "workload-100", "title": "100 cards", "fixture": "workload-100",
+        "evidence": [{ "kind": "menu", "name": "Fit Content" }, { "kind": "wait", "ms": 1500 },
+                     { "kind": "snapshot", "path": "{dir}/workload-100-fit.png" },
+                     { "kind": "menu", "name": "Actual Size" }, { "kind": "wait", "ms": 1500 }] }
+    ]
+  },
+  {
+    "group": "Spaces",
+    "states": [
+      { "name": "spaces", "title": "Five spaces", "fixture": "spaces",
+        "evidence": [{ "kind": "snapshot", "path": "{dir}/spaces-board.png" },
+                     { "kind": "clickControl", "name": "Spaces" }, { "kind": "wait", "ms": 800 }] },
+      { "name": "first-space-empty", "title": "First space empty", "fixture": "first-space-empty" }
+    ]
+  },
+  {
+    "group": "Storage",
+    "states": [
+      { "name": "upgraded-store", "title": "Upgraded old store", "fixture": "upgraded-store" },
+      { "name": "save-error", "title": "Save fails on edit", "fixture": "typical", "storeMode": "readonly-journal",
+        "evidence": [{ "kind": "snapshot", "path": "{dir}/save-error-before-edit.png" },
+                     { "kind": "menu", "name": "New Note" }, { "kind": "wait", "ms": 400 }] },
+      { "name": "load-error-corrupt", "title": "Corrupt store", "fixture": "corrupt" },
+      { "name": "load-error-readonly", "title": "Read-only store", "fixture": "typical", "storeMode": "readonly" },
+      { "name": "load-error-newer", "title": "Store from newer Desk", "fixture": "newer-version" },
+      { "name": "load-error-broken-image", "title": "Broken image data", "fixture": "broken-image" }
+    ]
+  },
+  {
+    "group": "Settings",
+    "states": [
+      { "name": "round-corners", "title": "Round corners", "fixture": "images", "defaults": { "cornerStyle": "Round corners" } },
+      { "name": "font-mono", "title": "Mono font", "fixture": "typical", "defaults": { "noteFont": "Mono" } },
+      { "name": "font-sans", "title": "Sans font", "fixture": "typical", "defaults": { "noteFont": "Sans" } },
+      { "name": "theme-light", "title": "Light theme", "fixture": "typical", "defaults": { "appearance": "Light" } },
+      { "name": "theme-dark", "title": "Dark theme", "fixture": "typical", "defaults": { "appearance": "Dark" } }
+    ]
+  },
+  {
+    "group": "Checklist",
+    "states": [
+      { "name": "checklist-started", "title": "Checklist 01/10", "fixture": "first-note",
+        "defaults": { "checklistCompletedTasks": ["createNote"] },
+        "evidence": [{ "kind": "snapshot", "path": "{dir}/checklist-started-board.png" },
+                     { "kind": "clickControl", "name": "Checklist" }, { "kind": "wait", "ms": 800 }] }
+    ]
+  }
+]

@@ -283,9 +283,13 @@ public final class MainController: NSViewController, NSMenuItemValidation, NSWin
         retryButton.cell?.setAccessibilityLabel("Retry Load")
 
         stateTitle.font = .systemFont(ofSize: 20, weight: .semibold)
-        stateTitle.textColor = .white
+        stateTitle.textColor = NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .white : .black
+        }
         stateMessage.font = .systemFont(ofSize: 13)
-        stateMessage.textColor = NSColor.white.withAlphaComponent(0.65)
+        stateMessage.textColor = NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor.white.withAlphaComponent(0.65) : NSColor.black.withAlphaComponent(0.65)
+        }
         stateMessage.alignment = .center
         stateMessage.maximumNumberOfLines = 6
         stateTitle.alignment = .center

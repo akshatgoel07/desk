@@ -283,9 +283,13 @@ public final class MainController: NSViewController, NSMenuItemValidation, NSWin
         retryButton.cell?.setAccessibilityLabel("Retry Load")
 
         stateTitle.font = .systemFont(ofSize: 20, weight: .semibold)
-        stateTitle.textColor = .white
+        stateTitle.textColor = NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .white : .black
+        }
         stateMessage.font = .systemFont(ofSize: 13)
-        stateMessage.textColor = NSColor.white.withAlphaComponent(0.65)
+        stateMessage.textColor = NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor.white.withAlphaComponent(0.65) : NSColor.black.withAlphaComponent(0.65)
+        }
         stateMessage.alignment = .center
         stateMessage.maximumNumberOfLines = 6
         stateTitle.alignment = .center
@@ -400,6 +404,7 @@ public final class MainController: NSViewController, NSMenuItemValidation, NSWin
         }
         spaceButton.isEnabled = plusButton.isEnabled
         settingsButton.isEnabled = plusButton.isEnabled
+        counterButton.isEnabled = plusButton.isEnabled
         view.effectiveAppearance.performAsCurrentDrawingAppearance {
             savePanel.layer?.backgroundColor = NSColor(srgbRed: 33 / 255, green: 36 / 255, blue: 38 / 255, alpha: 1).cgColor
             savePanel.layer?.borderColor = NSColor.systemRed.cgColor

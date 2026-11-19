@@ -227,6 +227,79 @@ struct NoteBlockTests {
         #expect(content.blocks[2].runs == [NoteRun("Task")])
     }
 
+    @Test func markedTextCommitsAtTheCaretAndKeepsTheModelInSync() {
+        let view = editor()
+        let none = NSRange(location: NSNotFound, length: 0)
+        enter("abcd", in: view)
+        view.setSelectedRange(NSRange(location: 8, length: 0))
+        view.setMarkedText("\u{b4}", selectedRange: NSRange(location: 1, length: 0), replacementRange: none)
+        #expect(view.content.plainText == "Title\nabcd")
+        view.insertText("\u{e9}", replacementRange: none)
+        #expect(view.content.plainText == "Title\nab\u{e9}cd")
+        #expect(view.string == view.content.editorText)
+        view.setSelectedRange(NSRange(location: 7, length: 2))
+        view.setMarkedText("\u{b4}", selectedRange: NSRange(location: 1, length: 0), replacementRange: none)
+        view.unmarkText()
+        #expect(view.content.plainText == "Title\na\u{b4}cd")
+        #expect(view.string == view.content.editorText)
+        view.setSelectedRange(NSRange(location: 7, length: 2))
+        view.setMarkedText("\u{2c6}", selectedRange: NSRange(location: 1, length: 0), replacementRange: none)
+        view.setMarkedText("", selectedRange: NSRange(location: 0, length: 0), replacementRange: none)
+        #expect(view.content.plainText == "Title\na\u{b4}cd")
+        #expect(view.string == view.content.editorText)
+        view.undo(nil)
+        #expect(view.content.plainText == "Title\nab\u{e9}cd")
+    }
+
+    @Test func builtInTextCommandsEditTheModelWithoutUndoFailure() {
+        let view = editor()
+        enter("Groceries list", in: view)
+        view.deleteWordBackward(nil)
+        #expect(view.content.plainText == "Title\nGroceries ")
+        #expect(view.string == view.content.editorText)
+        view.setSelectedRange(NSRange(location: 0, length: 5))
+        view.delete(nil)
+        #expect(view.content.plainText == "\nGroceries ")
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.clearContents()
+        pasteboard.setString("milk", forType: .string)
+        view.setSelectedRange(NSRange(location: 11, length: 0))
+        _ = view.readSelection(from: pasteboard, type: .string)
+        #expect(view.content.plainText == "\nGroceries milk")
+        #expect(view.string == view.content.editorText)
+        view.undo(nil)
+        #expect(view.content.plainText == "\nGroceries ")
+        view.undo(nil)
+        #expect(view.content.plainText == "Title\nGroceries ")
+        view.undo(nil)
+        #expect(view.content.plainText == "Title\nGroceries list")
+    }
+
+    @Test(arguments: [false, true])
+    func taskMarkersContrastWithTheCardInBothThemes(light: Bool) throws {
+        func brightness(checked: Bool) throws -> CGFloat {
+            let color: NSColor = light ? .black : NotePageTypography.textColor
+            let text = NoteBlockRendering.text(NoteContent(blocks: [NoteBlock(style: .task, text: "Task", checked: checked)]), color: color)
+            let attachment = try #require(text.attribute(.attachment, at: 0, effectiveRange: nil) as? NSTextAttachment)
+            let cell = try #require(attachment.attachmentCell as? NSTextAttachmentCell)
+            let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 32, pixelsHigh: 18, bitsPerSample: 8,
+                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+            (light ? NSColor.white : NotePageTransition.cardColor).setFill()
+            CGRect(x: 0, y: 0, width: 32, height: 18).fill()
+            cell.draw(withFrame: CGRect(x: 0, y: 0, width: 32, height: 18), in: NSView())
+            NSGraphicsContext.restoreGraphicsState()
+            return try #require(bitmap.colorAt(x: 9, y: 9)?.usingColorSpace(.deviceRGB)).brightnessComponent
+        }
+        let card = light ? 1 : try #require(NotePageTransition.cardColor.usingColorSpace(.deviceRGB)).brightnessComponent
+        let checked = try brightness(checked: true)
+        let unchecked = try brightness(checked: false)
+        #expect(abs(checked - card) > 0.5)
+        #expect(abs(unchecked - card) < abs(checked - card))
+    }
+
     @Test func formatRemovalKeepsNextEntryPlain() {
         let view = editor()
         enter("Words sample", in: view)

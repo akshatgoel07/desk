@@ -34,8 +34,13 @@ public final class FFmpegConverter {
             proc.arguments = ["-y", "-i", url.path] + Self.remuxProfile + [out.path]
             proc.standardError = FileHandle.nullDevice
             Task { @MainActor in self?.currentProcess = proc }
-            proc.terminationHandler = { [weak self] _ in
+            proc.terminationHandler = { [weak self] process in
                 Task { @MainActor in self?.currentProcess = nil }
+                guard process.terminationStatus == 0 else {
+                    try? FileManager.default.removeItem(at: out)
+                    cont.resume(returning: nil)
+                    return
+                }
                 cont.resume(returning: FileManager.default.fileExists(atPath: out.path) ? out : nil)
             }
             try? proc.run()
@@ -50,8 +55,8 @@ public final class FFmpegConverter {
         let pipe = Pipe()
         proc.standardOutput = pipe
         try? proc.run()
-        while proc.isRunning { usleep(20_000) }
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        while proc.isRunning { usleep(20_000) }
         let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         let streams = root?["streams"] as? [[String: Any]] ?? []
         let duration = (streams.first?["duration"] as? String).flatMap(Double.init) ?? 0

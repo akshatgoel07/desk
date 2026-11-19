@@ -179,11 +179,11 @@ public final class NoteStore {
                 NSPredicate(format: "kind IN %@ AND space.id == %@", ["note", "image"], $0 as CVarArg)
             } ?? NSPredicate(format: "kind IN %@", ["note", "image"])
             request.sortDescriptors = [NSSortDescriptor(key: "zIndex", ascending: true)]
-            return try context.fetch(request).map { item in
+            return try context.fetch(request).compactMap { item in
                 let image: ImageAttachment?
                 if item.kind == "image" {
                     guard let bytes = item.imageData, let decoded = ImageAttachment(data: bytes, name: item.imageName ?? "Image") else {
-                        throw NoteStoreError.storage("Cannot read the image bytes.")
+                        return nil
                     }
                     image = decoded
                 } else {
@@ -410,7 +410,15 @@ public final class NoteStore {
             return .success(try action(openContext()))
         } catch {
             context?.rollback()
-            return .failure(error as? NoteStoreError ?? .storage(error.localizedDescription))
+            if let error = error as? NoteStoreError { return .failure(error) }
+            let error = error as NSError
+            guard error.domain == NSSQLiteErrorDomain else { return .failure(.storage(error.localizedDescription)) }
+            switch error.code {
+            case 13: return .failure(.storage("The disk is full."))
+            case 8, 23: return .failure(.storage("Desk does not have permission to change the store file."))
+            case 14: return .failure(.storage("Desk cannot open the store file."))
+            default: return .failure(.storage("The store file is damaged or cannot be read."))
+            }
         }
     }
 

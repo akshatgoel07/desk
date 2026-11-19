@@ -1,3 +1,4 @@
+import AppKit
 import CoreData
 import Foundation
 import Testing
@@ -214,5 +215,78 @@ struct NoteStoreTests {
             return
         }
         #expect(!error.message.isEmpty)
+    }
+
+    @Test func unreadableImageBytesSkipOnlyThatCardAndKeepTheRow() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("notes.sqlite")
+        let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 8, pixelsHigh: 8, bitsPerSample: 8,
+            samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+        let png = try #require(bitmap.representation(using: .png, properties: [:]))
+        let image = try #require(ImageAttachment(data: png, name: "Dot.png"))
+        let good = NoteRecord(id: UUID(), text: "Keep me", frame: CGRect(x: 0, y: 0, width: 140, height: 200), order: 0)
+        let broken = NoteRecord(id: UUID(), text: "", frame: CGRect(x: 200, y: 0, width: 8, height: 8), order: 1, image: image)
+        try autoreleasepool {
+            let store = NoteStore(storeURL: url)
+            try store.insert(good).get()
+            try store.insert(broken).get()
+        }
+        try autoreleasepool {
+            let coordinator = NSPersistentStoreCoordinator(managedObjectModel: CoreDataStack.makeModel())
+            let persistentStore = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: url)
+            let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+            context.persistentStoreCoordinator = coordinator
+            let request = NSFetchRequest<ItemMO>(entityName: "Item")
+            request.predicate = NSPredicate(format: "identifier == %@", broken.id as CVarArg)
+            let item = try #require(try context.fetch(request).first)
+            item.imageData = Data("Damaged bytes".utf8)
+            try context.save()
+            try coordinator.remove(persistentStore)
+        }
+        try autoreleasepool { () throws in
+            let store = NoteStore(storeURL: url)
+            #expect(try store.load().get() == [good])
+            #expect(try store.load(spaceID: SpaceRecord.firstID).get() == [good])
+        }
+        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: CoreDataStack.makeModel())
+        let persistentStore = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: url)
+        defer { try? coordinator.remove(persistentStore) }
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = coordinator
+        #expect(try context.count(for: NSFetchRequest<ItemMO>(entityName: "Item")) == 2)
+    }
+
+    @Test func truncatedStoreReportsAReadableMessage() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("notes.sqlite")
+        try autoreleasepool {
+            let model = CoreDataStack.makeModel()
+            let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
+            let persistentStore = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: url,
+                options: [NSSQLitePragmasOption: ["journal_mode": "DELETE"]])
+            let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+            context.persistentStoreCoordinator = coordinator
+            for index in 0..<40 {
+                let canvas = CanvasMO(entity: model.entitiesByName["Canvas"]!, insertInto: context)
+                canvas.identifier = UUID()
+                canvas.title = String(repeating: "Board \(index) ", count: 60)
+                canvas.index = Int64(index)
+                canvas.lastSeen = 0
+            }
+            try context.save()
+            try coordinator.remove(persistentStore)
+        }
+        let bytes = try Data(contentsOf: url)
+        try #require(bytes.count > 12_288)
+        try bytes.prefix(12_288).write(to: url)
+        guard case .failure(let error) = NoteStore(storeURL: url).load() else {
+            Issue.record("A truncated store must return a load failure.")
+            return
+        }
+        #expect(error.message == "Cannot access the note store. The store file is damaged or cannot be read.")
     }
 }

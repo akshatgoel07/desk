@@ -194,6 +194,16 @@ struct ImageCardTests {
         }
     }
 
+    @Test func wideImageCardDoesNotJumpWhenAResizeStarts() {
+        let frame = CGRect(x: 10, y: 20, width: 320, height: 16)
+        for handle in ResizeHandle.allCases {
+            #expect(handle.resizeImage(frame, by: .zero) == frame)
+        }
+        let grown = ResizeHandle.right.resizeImage(frame, by: CGSize(width: 32, height: 0))
+        #expect(abs(grown.width - 352) < 0.000001)
+        #expect(abs(grown.height - 17.6) < 0.000001)
+    }
+
     @Test func fileImportsAcceptAllRequiredImageIOFormats() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

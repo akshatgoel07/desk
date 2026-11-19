@@ -66,6 +66,7 @@ public final class PaywallService {
 
     public private(set) var unlockedCanvasesSinceUnboxing: Int = 0
     private var lastNags = [Int: Date]()
+    private var nagCounts = [Int: Int]()
 
     public func limits(newCustomer: Bool) -> (items: Int, canvases: Int) {
         let items = newCustomer ? itemsLimitForNewUsers : itemsLimit
@@ -74,15 +75,13 @@ public final class PaywallService {
     }
 
     public func shouldNag(context: Int, now: Date = .init()) -> Bool {
-        guard let last = lastNags[context] else {
-            lastNags[context] = now
-            return true
+        let count = nagCounts[context, default: 0]
+        if let last = lastNags[context] {
+            guard !notificationIntervals.isEmpty,
+                  now.timeIntervalSince(last) >= notificationIntervals[min(count, notificationIntervals.count - 1)] else { return false }
         }
-        let elapsed = now.timeIntervalSince(last)
-        if let interval = notificationIntervals.first(where: { $0 <= elapsed }) {
-            lastNags[context] = now
-            return interval > 0 || last == now
-        }
-        return false
+        lastNags[context] = now
+        nagCounts[context] = count + 1
+        return true
     }
 }

@@ -12,10 +12,14 @@ enum NotePageTypography {
         return NSRange(location: 0, length: newline.location == NSNotFound ? text.length : NSMaxRange(newline))
     }
 
-    static func font(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
-        AppPreferences.shared.noteFont == .mono
-            ? .monospacedSystemFont(ofSize: size, weight: weight)
-            : .systemFont(ofSize: size, weight: weight)
+    static func font(size: CGFloat, weight: NSFont.Weight = .regular, heading: Bool? = nil) -> NSFont {
+        let mono: Bool
+        switch AppPreferences.shared.noteFont {
+        case .mono: mono = true
+        case .sans: mono = false
+        case .mixed: mono = !(heading ?? (size > 16))
+        }
+        return mono ? .monospacedSystemFont(ofSize: size, weight: weight) : .systemFont(ofSize: size, weight: weight)
     }
 
     static func attributes(heading: Bool) -> [NSAttributedString.Key: Any] {

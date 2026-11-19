@@ -130,8 +130,9 @@ extension ResizeHandle {
         } else {
             factor = 1 + ((left || right) ? dx / rect.width : dy / rect.height)
         }
-        let size = CGSize(width: rect.width * max(32 / min(rect.width, rect.height), factor),
-                          height: rect.height * max(32 / min(rect.width, rect.height), factor))
+        let minimum = min(1, 32 / min(rect.width, rect.height))
+        let size = CGSize(width: rect.width * max(minimum, factor),
+                          height: rect.height * max(minimum, factor))
         return CGRect(x: left ? rect.maxX - size.width : right ? rect.minX : rect.midX - size.width / 2,
                       y: bottom ? rect.maxY - size.height : top ? rect.minY : rect.midY - size.height / 2,
                       width: size.width, height: size.height)

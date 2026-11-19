@@ -87,6 +87,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
     private var pinchStart: Viewport?
     var isPinching: Bool { pinchStart != nil }
     private var cameraTimer: Timer?
+    private var textSharpnessWork: DispatchWorkItem?
     var isCameraAnimating: Bool { contentLayerView.layer?.animation(forKey: "study.camera") != nil }
     var hasCameraTimer: Bool { cameraTimer != nil }
     var cameraTarget: Viewport { targetViewport }
@@ -174,6 +175,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
                 }
             }
             for note in notes { displayNote(note) }
+            scheduleTextSharpness()
             loadState = notes.isEmpty ? .empty : .populated
             updateSelectionOverlay()
         case .failure(let error):
@@ -515,6 +517,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
         loadState = notes.isEmpty ? .empty : .populated
         saveError = failure?.message
         updateSelectionOverlay()
+        scheduleTextSharpness()
         onStateChange?()
         if !inverse.isEmpty { registerNoteUndo(inverse, actionName: actionName) }
         return failure == nil
@@ -803,7 +806,29 @@ public final class CanvasView: NSView, NSMenuItemValidation {
         updateSelectionOverlay(announce: false)
         layoutEditor()
         CATransaction.commit()
+        scheduleTextSharpness()
         onViewportChange?()
+    }
+
+    private func scheduleTextSharpness() {
+        textSharpnessWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.updateTextSharpness() }
+        }
+        textSharpnessWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
+    func updateTextSharpness() {
+        textSharpnessWork?.cancel()
+        textSharpnessWork = nil
+        guard !isCameraAnimating else { return }
+        let viewport = targetViewport
+        let zoom = max(1, viewport.scale)
+        for view in itemViews {
+            let visible = zoom > 1 && bounds.intersects(viewport.viewRect(fromCanvas: view.frame))
+            view.setTextZoom(visible ? zoom : 1)
+        }
     }
 
     func interruptCamera() {
@@ -811,6 +836,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
             SpringCore.shared.cancel(layer, keyPath: "sublayerTransform", behavior: .keepCurrentValue)
             let transform = layer.sublayerTransform
             viewport = Viewport(scale: transform.m11, translation: CGPoint(x: transform.m41, y: transform.m42))
+            scheduleTextSharpness()
         }
         cameraTimer?.invalidate()
         cameraTimer = nil
@@ -844,6 +870,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
                 if !self.isCameraAnimating {
                     timer.invalidate()
                     self.cameraTimer = nil
+                    self.scheduleTextSharpness()
                 }
             }
         }

@@ -100,4 +100,27 @@ struct AnimationPerformanceTests {
         canvas.actualSize(nil)
         #expect(canvas.cameraTarget.scale == 1)
     }
+
+    @Test func visibleCardTextRasterizesAtTheZoomScaleAfterTheViewportSettles() throws {
+        let (canvas, window, records) = try canvas(notes: 30)
+        defer { window.contentView = nil }
+        let backing = window.backingScaleFactor
+        func textScale(_ id: UUID) throws -> CGFloat {
+            let view = try #require(canvas.itemViews.first { $0.id == id })
+            let text = try #require(view.contentLayer.sublayers?.first { $0 is NoteTextLayer })
+            let inner = try #require(text.sublayers?.first)
+            #expect(inner.contentsScale == text.contentsScale)
+            return text.contentsScale
+        }
+        canvas.setViewport(Viewport(scale: 1.95, translation: .zero))
+        #expect(try textScale(records[0].id) == backing)
+        canvas.updateTextSharpness()
+        #expect(abs(try textScale(records[0].id) - backing * 1.95) < 0.000001)
+        #expect(try textScale(records[29].id) == backing)
+        let card = try #require(canvas.itemViews.first { $0.id == records[0].id })
+        #expect(card.container.contentsScale == backing)
+        canvas.setViewport(Viewport(scale: 0.8, translation: .zero))
+        canvas.updateTextSharpness()
+        #expect(try textScale(records[0].id) == backing)
+    }
 }

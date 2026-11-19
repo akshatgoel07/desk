@@ -173,14 +173,29 @@ public final class CanvasItemView: NSView {
         applyColor()
     }
 
+    private(set) var textZoom: CGFloat = 1
+
+    func setTextZoom(_ zoom: CGFloat) {
+        guard zoom != textZoom else { return }
+        textZoom = zoom
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        updateContentsScale()
+        CATransaction.commit()
+    }
+
     private func updateContentsScale() {
         let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
         for current in [layer, container, shadowShapeLayer, contentLayer].compactMap({ $0 }) {
             current.contentsScale = scale
         }
         for child in contentLayer.sublayers ?? [] {
-            child.contentsScale = scale
-            child.sublayers?.forEach { $0.contentsScale = scale }
+            let childScale = child is NoteTextLayer ? scale * textZoom : scale
+            child.contentsScale = childScale
+            for layer in child.sublayers ?? [] where layer.contentsScale != childScale {
+                layer.contentsScale = childScale
+                layer.setNeedsDisplay()
+            }
         }
     }
 

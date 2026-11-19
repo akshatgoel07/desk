@@ -83,9 +83,11 @@ public final class CanvasView: NSView, NSMenuItemValidation {
         set { targetViewport = newValue }
     }
     public var magnification: CGFloat { viewport.scale }
+    private(set) var isApplyingFrames = false
     private var pinchStart: Viewport?
     var isPinching: Bool { pinchStart != nil }
     private var cameraTimer: Timer?
+    private var textSharpnessWork: DispatchWorkItem?
     var isCameraAnimating: Bool { contentLayerView.layer?.animation(forKey: "study.camera") != nil }
     var hasCameraTimer: Bool { cameraTimer != nil }
     var cameraTarget: Viewport { targetViewport }
@@ -173,6 +175,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
                 }
             }
             for note in notes { displayNote(note) }
+            scheduleTextSharpness()
             loadState = notes.isEmpty ? .empty : .populated
             updateSelectionOverlay()
         case .failure(let error):
@@ -391,10 +394,12 @@ public final class CanvasView: NSView, NSMenuItemValidation {
                 fittedFrames[notes[index].id] = fitted
             }
         }
+        isApplyingFrames = true
         for view in itemViews {
             if let frame = fittedFrames[view.id], view.frame != frame { view.frame = frame }
         }
-        updateSelectionOverlay()
+        isApplyingFrames = false
+        updateSelectionOverlay(announce: false)
         CATransaction.commit()
     }
 
@@ -487,7 +492,9 @@ public final class CanvasView: NSView, NSMenuItemValidation {
                 if let previous, let index = notes.firstIndex(where: { $0.id == note.id }) {
                     notes[index] = note
                     let view = itemViews.first { $0.id == note.id }
+                    isApplyingFrames = true
                     view?.frame = note.frame
+                    isApplyingFrames = false
                     view?.applyColor()
                     inverse.insert(.update(previous), at: 0)
                 }
@@ -510,6 +517,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
         loadState = notes.isEmpty ? .empty : .populated
         saveError = failure?.message
         updateSelectionOverlay()
+        scheduleTextSharpness()
         onStateChange?()
         if !inverse.isEmpty { registerNoteUndo(inverse, actionName: actionName) }
         return failure == nil
@@ -697,24 +705,26 @@ public final class CanvasView: NSView, NSMenuItemValidation {
             cornerWidth: Self.noteCornerRadius, cornerHeight: Self.noteCornerRadius, transform: nil)
     }
 
-    func updateSelectionOverlay() {
+    func updateSelectionOverlay(announce: Bool = true) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         overlayView.frame = bounds
         overlayLayer.contentsScale = window?.backingScaleFactor ?? 1
         overlayLayer.strokeColor = NSColor.white.cgColor
+        let viewport = viewport
+        let cornerRadius = Self.noteCornerRadius
         let path = CGMutablePath()
         for note in notes where selection.contains(note.id) {
             let outset: CGFloat = note.kind == .note ? 1 : 4
-            let rect = viewRect(fromCanvas: note.frame).insetBy(dx: -outset, dy: -outset)
-            let radius = (note.kind == .image ? 0 : Self.noteCornerRadius) * magnification + outset
+            let rect = viewport.viewRect(fromCanvas: note.frame).insetBy(dx: -outset, dy: -outset)
+            let radius = (note.kind == .image ? 0 : cornerRadius) * viewport.scale + outset
             path.addRoundedRect(in: rect, cornerWidth: radius, cornerHeight: radius)
         }
         overlayLayer.path = path
         let focusedNote = window?.firstResponder as? CanvasItemView
         let focusRect: CGRect?
         if let focusedNote, focusedNote.canvas === self {
-            focusRect = viewRect(fromCanvas: focusedNote.frame).insetBy(dx: -4, dy: -4)
+            focusRect = viewport.viewRect(fromCanvas: focusedNote.frame).insetBy(dx: -4, dy: -4)
         } else {
             focusRect = nil
         }
@@ -725,6 +735,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
         overlayLayer.lineWidth = contrast ? 3 : 2
         CATransaction.commit()
         window?.invalidateCursorRects(for: self)
+        guard announce else { return }
         let value = accessibilityValue() as? String ?? ""
         if announcedSelection != selection || announcedValue != value {
             let selectionChanged = announcedSelection != selection
@@ -792,10 +803,32 @@ public final class CanvasView: NSView, NSMenuItemValidation {
         contentLayerView.layer?.position = .zero
         contentLayerView.layer?.sublayerTransform = CATransform3DMakeAffineTransform(targetViewport.transform)
         itemViews.forEach { $0.refreshImageThumbnail() }
-        updateSelectionOverlay()
+        updateSelectionOverlay(announce: false)
         layoutEditor()
         CATransaction.commit()
+        scheduleTextSharpness()
         onViewportChange?()
+    }
+
+    private func scheduleTextSharpness() {
+        textSharpnessWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.updateTextSharpness() }
+        }
+        textSharpnessWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
+    func updateTextSharpness() {
+        textSharpnessWork?.cancel()
+        textSharpnessWork = nil
+        guard !isCameraAnimating else { return }
+        let viewport = targetViewport
+        let zoom = max(1, viewport.scale)
+        for view in itemViews {
+            let visible = zoom > 1 && bounds.intersects(viewport.viewRect(fromCanvas: view.frame))
+            view.setTextZoom(visible ? zoom : 1)
+        }
     }
 
     func interruptCamera() {
@@ -803,6 +836,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
             SpringCore.shared.cancel(layer, keyPath: "sublayerTransform", behavior: .keepCurrentValue)
             let transform = layer.sublayerTransform
             viewport = Viewport(scale: transform.m11, translation: CGPoint(x: transform.m41, y: transform.m42))
+            scheduleTextSharpness()
         }
         cameraTimer?.invalidate()
         cameraTimer = nil
@@ -830,12 +864,13 @@ public final class CanvasView: NSView, NSMenuItemValidation {
                     timer.invalidate()
                     return
                 }
-                self.updateSelectionOverlay()
+                self.updateSelectionOverlay(announce: false)
                 self.layoutEditor()
                 self.onViewportChange?()
                 if !self.isCameraAnimating {
                     timer.invalidate()
                     self.cameraTimer = nil
+                    self.scheduleTextSharpness()
                 }
             }
         }
@@ -844,14 +879,14 @@ public final class CanvasView: NSView, NSMenuItemValidation {
     }
 
     private func zoomCamera(to scale: CGFloat) {
-        var target = viewport
+        var target = targetViewport
         target.zoom(to: scale, around: CGPoint(x: bounds.midX, y: bounds.midY))
         moveCamera(to: target)
     }
 
-    @objc func zoomIn(_ sender: Any?) { zoomCamera(to: viewport.scale * 1.25) }
+    @objc func zoomIn(_ sender: Any?) { zoomCamera(to: targetViewport.scale * 1.25) }
 
-    @objc func zoomOut(_ sender: Any?) { zoomCamera(to: viewport.scale / 1.25) }
+    @objc func zoomOut(_ sender: Any?) { zoomCamera(to: targetViewport.scale / 1.25) }
 
     @objc func actualSize(_ sender: Any?) { zoomCamera(to: 1) }
 

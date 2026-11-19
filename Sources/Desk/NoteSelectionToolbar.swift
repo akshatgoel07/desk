@@ -48,7 +48,10 @@ final class NoteSelectionToolbar: NSView {
         clear?.isEnabled = runs.contains { !$0.marks.isEmpty || $0.link != nil }
     }
 
-    func place(in bounds: CGRect) { frame = CGRect(x: (bounds.width - 392) / 2, y: bounds.height - 90, width: 392, height: 58) }
+    func place(in bounds: CGRect) {
+        frame = CGRect(x: (bounds.width - 392) / 2, y: bounds.height - 90, width: 392, height: 58)
+        layer?.updateRoundedShadowPath()
+    }
 
     func setVisible(_ value: Bool, in bounds: CGRect) {
         guard value != visible else { return }
@@ -68,5 +71,12 @@ final class NoteSelectionToolbar: NSView {
         group.duration = 1.0 / 3.0
         group.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1, 0.3, 1)
         layer.add(group, forKey: "note.toolbar")
+    }
+}
+
+extension CALayer {
+    func updateRoundedShadowPath() {
+        let path = CGPath(roundedRect: bounds, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
+        if shadowPath != path { shadowPath = path }
     }
 }

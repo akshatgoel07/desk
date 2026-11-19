@@ -51,6 +51,7 @@ public final class CanvasItemView: NSView {
     private let image: ImageAttachment?
     private let cardKind: ItemKind
     private var thumbnailPixels = 0
+    private var thumbnailRequest = 0
     private(set) var thumbnailSize = CGSize.zero
     weak var canvas: CanvasView?
     public var baseItem: (id: UUID, size: CGSize) {
@@ -66,7 +67,8 @@ public final class CanvasItemView: NSView {
 
     override public var frame: NSRect {
         didSet {
-            needsLayout = true
+            if frame.size != oldValue.size { needsLayout = true }
+            guard canvas?.isApplyingFrames != true else { return }
             canvas?.updateFrame(id: id, frame: frame)
         }
     }
@@ -171,14 +173,29 @@ public final class CanvasItemView: NSView {
         applyColor()
     }
 
+    private(set) var textZoom: CGFloat = 1
+
+    func setTextZoom(_ zoom: CGFloat) {
+        guard zoom != textZoom else { return }
+        textZoom = zoom
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        updateContentsScale()
+        CATransaction.commit()
+    }
+
     private func updateContentsScale() {
         let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
         for current in [layer, container, shadowShapeLayer, contentLayer].compactMap({ $0 }) {
             current.contentsScale = scale
         }
         for child in contentLayer.sublayers ?? [] {
-            child.contentsScale = scale
-            child.sublayers?.forEach { $0.contentsScale = scale }
+            let childScale = child is NoteTextLayer ? scale * textZoom : scale
+            child.contentsScale = childScale
+            for layer in child.sublayers ?? [] where layer.contentsScale != childScale {
+                layer.contentsScale = childScale
+                layer.setNeedsDisplay()
+            }
         }
     }
 
@@ -203,14 +220,46 @@ public final class CanvasItemView: NSView {
     func refreshImageThumbnail() {
         guard let image else { return }
         let scale = (window?.backingScaleFactor ?? 1) * (canvas?.magnification ?? 1)
-        let pixels = max(1, Int(ceil(max(bounds.width, bounds.height) * scale)))
+        let pixels = Self.thumbnailPixels(needed: max(bounds.width, bounds.height) * scale, source: image.pixelSize)
         guard pixels != thumbnailPixels else { return }
-        guard let thumbnail = image.thumbnail(maxPixels: pixels) else { return }
+        thumbnailRequest += 1
+        guard contentLayer.contents != nil else {
+            guard let thumbnail = image.thumbnail(maxPixels: pixels) else { return }
+            thumbnailPixels = pixels
+            applyThumbnail(thumbnail)
+            return
+        }
         thumbnailPixels = pixels
+        let request = thumbnailRequest
+        Task.detached(priority: .userInitiated) {
+            let thumbnail = image.thumbnail(maxPixels: pixels)
+            await MainActor.run { [weak self] in
+                guard let self, self.thumbnailRequest == request else { return }
+                guard let thumbnail else {
+                    self.thumbnailPixels = 0
+                    return
+                }
+                self.applyThumbnail(thumbnail)
+            }
+        }
+    }
+
+    private func applyThumbnail(_ thumbnail: CGImage) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         thumbnailSize = CGSize(width: thumbnail.width, height: thumbnail.height)
         contentLayer.contents = thumbnail
         contentLayer.contentsGravity = .resizeAspect
         contentLayer.minificationFilter = .trilinear
+        CATransaction.commit()
+    }
+
+    static func thumbnailPixels(needed: CGFloat, source: CGSize) -> Int {
+        let native = max(1, Int(ceil(max(source.width, source.height))))
+        let wanted = max(1, Int(ceil(needed)))
+        var bucket = 64
+        while bucket < wanted { bucket *= 2 }
+        return min(bucket, native)
     }
 
     private func rebuildContent(item: CanvasItem) {

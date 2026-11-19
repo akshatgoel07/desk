@@ -795,6 +795,11 @@ private final class ContentActionBar: NSView {
 
     override var intrinsicContentSize: NSSize { NSSize(width: isNoteSelection ? 144 : 206, height: 58) }
 
+    override func layout() {
+        super.layout()
+        layer?.updateRoundedShadowPath()
+    }
+
     override func hitTest(_ point: NSPoint) -> NSView? {
         canvas?.hasNotePage == true ? nil : super.hitTest(point)
     }
@@ -1061,6 +1066,8 @@ private final class ContentMenuOverlay: NSView {
         super.layout()
         panel.frame = CGRect(x: bounds.width - 336, y: 74, width: 312, height: 322)
         importPanel.frame = CGRect(x: panel.frame.minX - 314, y: panel.frame.maxY - 258, width: 312, height: 60)
+        panel.layer?.updateRoundedShadowPath()
+        importPanel.layer?.updateRoundedShadowPath()
     }
 
     func animateEntrance() {
@@ -1200,6 +1207,7 @@ private final class SpaceMenuOverlay: NSView {
     override func layout() {
         super.layout()
         panel.frame = CGRect(x: bounds.width - 404, y: 74, width: 312, height: 16 + CGFloat(spaces.count) * 45)
+        panel.layer?.updateRoundedShadowPath()
     }
 
     func animateEntrance() {

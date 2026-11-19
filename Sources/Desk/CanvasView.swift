@@ -397,7 +397,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
             if let frame = fittedFrames[view.id], view.frame != frame { view.frame = frame }
         }
         isApplyingFrames = false
-        updateSelectionOverlay()
+        updateSelectionOverlay(announce: false)
         CATransaction.commit()
     }
 
@@ -702,24 +702,26 @@ public final class CanvasView: NSView, NSMenuItemValidation {
             cornerWidth: Self.noteCornerRadius, cornerHeight: Self.noteCornerRadius, transform: nil)
     }
 
-    func updateSelectionOverlay() {
+    func updateSelectionOverlay(announce: Bool = true) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         overlayView.frame = bounds
         overlayLayer.contentsScale = window?.backingScaleFactor ?? 1
         overlayLayer.strokeColor = NSColor.white.cgColor
+        let viewport = viewport
+        let cornerRadius = Self.noteCornerRadius
         let path = CGMutablePath()
         for note in notes where selection.contains(note.id) {
             let outset: CGFloat = note.kind == .note ? 1 : 4
-            let rect = viewRect(fromCanvas: note.frame).insetBy(dx: -outset, dy: -outset)
-            let radius = (note.kind == .image ? 0 : Self.noteCornerRadius) * magnification + outset
+            let rect = viewport.viewRect(fromCanvas: note.frame).insetBy(dx: -outset, dy: -outset)
+            let radius = (note.kind == .image ? 0 : cornerRadius) * viewport.scale + outset
             path.addRoundedRect(in: rect, cornerWidth: radius, cornerHeight: radius)
         }
         overlayLayer.path = path
         let focusedNote = window?.firstResponder as? CanvasItemView
         let focusRect: CGRect?
         if let focusedNote, focusedNote.canvas === self {
-            focusRect = viewRect(fromCanvas: focusedNote.frame).insetBy(dx: -4, dy: -4)
+            focusRect = viewport.viewRect(fromCanvas: focusedNote.frame).insetBy(dx: -4, dy: -4)
         } else {
             focusRect = nil
         }
@@ -730,6 +732,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
         overlayLayer.lineWidth = contrast ? 3 : 2
         CATransaction.commit()
         window?.invalidateCursorRects(for: self)
+        guard announce else { return }
         let value = accessibilityValue() as? String ?? ""
         if announcedSelection != selection || announcedValue != value {
             let selectionChanged = announcedSelection != selection
@@ -797,7 +800,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
         contentLayerView.layer?.position = .zero
         contentLayerView.layer?.sublayerTransform = CATransform3DMakeAffineTransform(targetViewport.transform)
         itemViews.forEach { $0.refreshImageThumbnail() }
-        updateSelectionOverlay()
+        updateSelectionOverlay(announce: false)
         layoutEditor()
         CATransaction.commit()
         onViewportChange?()
@@ -835,7 +838,7 @@ public final class CanvasView: NSView, NSMenuItemValidation {
                     timer.invalidate()
                     return
                 }
-                self.updateSelectionOverlay()
+                self.updateSelectionOverlay(announce: false)
                 self.layoutEditor()
                 self.onViewportChange?()
                 if !self.isCameraAnimating {

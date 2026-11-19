@@ -63,4 +63,16 @@ struct AnimationPerformanceTests {
         #expect(view.needsLayout)
         #expect(canvas.notes.first { $0.id == records[1].id }?.frame.size == CGSize(width: 180, height: 220))
     }
+
+    @Test func outlineFollowsPanAndZoom() throws {
+        let (canvas, window, records) = try canvas(notes: 12)
+        defer { window.contentView = nil }
+        canvas.select([records[5].id])
+        canvas.setViewport(Viewport(scale: 2, translation: CGPoint(x: -40, y: 25)))
+        let outline = try #require(canvas.overlayLayer.path).boundingBoxOfPath
+        let expected = canvas.viewRect(fromCanvas: records[5].frame).insetBy(dx: -1, dy: -1)
+        #expect(abs(outline.minX - expected.minX) < 0.001)
+        #expect(abs(outline.width - expected.width) < 0.001)
+        #expect(canvas.accessibilityValue() as? String == "Note 5")
+    }
 }
